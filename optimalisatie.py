@@ -7,7 +7,7 @@ from numpy.random import RandomState
 import pulp
 import alns
 import matplotlib.pyplot as plt
-from synchrotool import Planning, Container
+from .synchrotool import Planning, Container
 
 
 class Methode(ABC):
