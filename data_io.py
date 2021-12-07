@@ -4,7 +4,7 @@ import json
 import pandas as pd
 import os
 from datetime import datetime, time, timedelta
-from synchrotool import Planning, Order, AdhocLegs
+from .synchrotool import Planning, Order, AdhocLegs
 
 
 class Object:
