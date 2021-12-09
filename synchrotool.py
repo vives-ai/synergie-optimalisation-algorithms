@@ -424,17 +424,17 @@ class Planning:
     def geef_container_traject(self, container_id: int):
         return self.trajecten[container_id]
 
-    def voeg_traject_toe(self, container_id: int, *legcapaciteiten):
+    def voeg_container_traject_toe(self, container_id: int, *legcapaciteiten):
         for legcapaciteit in legcapaciteiten:
             legcapaciteit.containers.append(container_id)
             if legcapaciteit not in self.legcapaciteiten:
                 self.adhoc_capaciteiten.append(legcapaciteit)
         self.trajecten[container_id] = legcapaciteiten
-        self.kosten[container_id] = self.geef_kost_van_traject(container_id)
+        self.kosten[container_id] = self.geef_totale_kost_van_container_traject(container_id)
         self.te_plannen.remove(container_id)
         self.gepland.add(container_id)
 
-    def verwijder_traject(self, container_id: int):
+    def verwijder_container_traject(self, container_id: int):
         for legcapaciteit in self.trajecten[container_id]:
             legcapaciteit.containers.remove(container_id)
             if legcapaciteit in self.adhoc_capaciteiten:
@@ -446,37 +446,115 @@ class Planning:
 
     def verwijder_alle_trajecten(self):
         for i in range(len(self.containers)):
-            self.verwijder_traject(i)
+            self.verwijder_container_traject(i)
 
-    def geef_kost_van_traject(self, container_id: int):
+    def geef_prijs_van_container_traject(self, container_id: int):
+        # prijs van 1 gegeven containertraject
+        traject = self.trajecten[container_id]
+        if traject:
+            return sum([legcapaciteit.prijs for legcapaciteit in traject])
+        return None
+
+    def geef_emissie_van_container_traject(self, container_id: int):
+        # emissie van 1 gegeven containertraject
         container = self.geef_container_object(container_id)
         traject = self.trajecten[container_id]
         if traject:
-            leg = traject[-1].leg
-            aankomst = leg.aankomst
-            prijs = 0.0
-            emissie = 0.0
-            for legcapaciteit in traject:
-                prijs += legcapaciteit.prijs
-                emissie += legcapaciteit.emissie
-            kost = prijs + emissie * container.emissiefactor
+            emissie = sum([legcapaciteit.emissie for legcapaciteit in traject])
+            return dict(emissie=emissie, kost=emissie * container.emissiefactor)
+        return None
+
+    def geef_boete_van_container_traject(self, container_id: int):
+        # boete van 1 gegeven containertraject
+        container = self.geef_container_object(container_id)
+        traject = self.trajecten[container_id]
+        if traject:
+            aankomst = traject[-1].leg.aankomst
             if aankomst > container.max_levertijd:
                 uren_te_laat = (aankomst - container.max_levertijd).total_seconds() / 3600.0
-                return kost + uren_te_laat * container.boete_te_laat
+                return dict(uren_te_vroeg=0, uren_te_laat=uren_te_laat, boete=uren_te_laat * container.boete_te_laat)
             elif aankomst < container.min_levertijd:
                 uren_te_vroeg = (container.min_levertijd - aankomst).total_seconds() / 3600.0
-                return kost + uren_te_vroeg * container.boete_te_vroeg
+                return dict(uren_te_vroeg=uren_te_vroeg, uren_te_laat=0, boete=uren_te_vroeg * container.boete_te_vroeg)
             else:
-                return kost
-        else:
+                return dict(uren_te_vroeg=0, uren_te_laat=0, boete=0.0)
+        return None
+
+    def geef_totale_kost_van_container_traject(self, container_id: int):
+        # totale kost van 1 gegeven containertraject
+        prijs = self.geef_prijs_van_container_traject(container_id)
+        emissie = self.geef_emissie_van_container_traject(container_id)["kost"]
+        boete = self.geef_boete_van_container_traject(container_id)["boete"]
+        try:
+            return prijs + emissie + boete
+        except:
             return None
 
     def geef_totale_kost(self):
-        totale_kost = 0.0
-        for kost in self.kosten:
-            if kost is not None:
-                totale_kost += kost
-        return totale_kost
+        # totale kostprijs van de planning (incl emissie en boetes)
+        return sum([kost for kost in self.kosten if kost is not None])
+
+    def maak_unieke_adhoc_capaciteiten(self):
+        # zorgt dat unieke adhoc capaciteiten worden samengevoegd
+        new_adhoc_capaciteiten = []
+        id = 0  # adhoc ids
+        for c_old in self.adhoc_capaciteiten:
+            exists = False
+            for c_new in new_adhoc_capaciteiten:
+                exists = self.__zelfde_adhoc_capaciteit(c_old, c_new)
+                if exists:
+                    container = c_old.containers[0]
+                    c_new.containers.append(container)
+                    c_new.aantal += 1
+                    for i, c in enumerate(self.trajecten[container]):
+                        if c == c_old:
+                            lst = list(self.trajecten[container])
+                            lst[i] = c_new
+                            self.trajecten[container] = tuple(lst)
+                    break
+            if not exists:
+                id -= 1
+                c_old.leg.id = id
+                new_adhoc_capaciteiten.append(c_old)
+        self.adhoc_capaciteiten = new_adhoc_capaciteiten
+
+    @staticmethod
+    def __zelfde_adhoc_capaciteit(cap1: LegCapaciteit, cap2: LegCapaciteit):
+        leg_attributes = ["van", "naar", "checkin", "vertrek", "aankomst"]
+        legcap_attributes = ["containertype", "prijs", "emissie"]
+        for attr in leg_attributes:
+            if getattr(cap1.leg, attr) != getattr(cap2.leg, attr):
+                return False
+        for attr in legcap_attributes:
+            if getattr(cap1, attr) != getattr(cap2, attr):
+                return False
+        return True
+
+    def geef_unieke_trajecten(self):
+        # groepeert trajecten
+        # geeft unieke trajecten als {traject: [container_ids]}
+        uniek = dict()
+        for container_id, traject in enumerate(self.trajecten):
+            if traject not in uniek:
+                uniek[traject] = []
+            uniek[traject].append(container_id)
+        return uniek
+
+    def geef_unieke_trajecten_per_order(self):
+        # groepeert trajecten per order
+        # retourneert {order: traject: aantal_containers}
+        order_trajecten = dict()
+        for order in self.orders:
+            order_trajecten[order] = dict()
+            for container_id in order.containers:
+                traject = self.trajecten[container_id]
+                if traject not in order_trajecten[order]:
+                    order_trajecten[order][traject] = dict(aantal=0, prijs=0, emissie=0, boete=0)
+                order_trajecten[order][traject]["aantal"] += 1
+                order_trajecten[order][traject]["prijs"] += self.geef_prijs_van_container_traject(container_id)
+                order_trajecten[order][traject]["emissie"] += self.geef_emissie_van_container_traject(container_id)["emissie"]
+                order_trajecten[order][traject]["boete"] += self.geef_boete_van_container_traject(container_id)["boete"]
+        return order_trajecten
 
     def dataframe(self, attribuut: str = 'orders'):
         # attribuut is 'orders' (default), 'legs', 'ordercapaciteiten', 'legcapaciteiten', 'containers', 'trajecten'

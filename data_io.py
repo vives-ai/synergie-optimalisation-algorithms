@@ -244,7 +244,7 @@ class DataFrameDict(DataObject):
             leg.dag = row.dag
             for _, cap in self.legcapaciteiten.iterrows():
                 if cap.leg == row.id:
-                    self.planning.voeg_legcapaciteit_toe(leg, cap.aantal, self._containertypes[cap.containertype],
+                    self.planning.voeg_legcapaciteit_toe(leg, int(cap.aantal), self._containertypes[cap.containertype],
                                                          cap.prijs, cap.emissie)
 
 
@@ -277,3 +277,60 @@ class ExcelFile(DataFile, DataFrameDict):
         data['afstanden'] = pd.read_excel(self.file, sheet_name="afstanden", index_col=0)
         data['adhoc_legs'] = pd.read_excel(self.file, sheet_name="adhoc_legs", index_col=0, header=None)
         DataFrameDict.__init__(self, data)
+
+
+class OptimizerResult:
+
+    def __init__(self, planning: Planning):
+        self.planning = planning
+
+    def geef_legs(self, as_json=True):
+        # retourneert OptimiserLegUse
+        # als json object (as_json=True)
+        # of als dict (as_json=False)
+        leg_use = []
+        for leg in self.planning.legs:
+            for containertype, capaciteit in leg.capaciteiten.items():
+                d = dict()
+                d["legId"] = leg.id # moet leg.db_id worden
+                d["containerType"] = str(containertype)
+                d["used"] = len(capaciteit.containers)
+                d["available"] = capaciteit.beschikbaar
+                leg_use.append(d)
+        return json.dumps(leg_use) if as_json else leg_use
+
+    def geef_adhoc_legs(self, as_json=True):
+        # retourneert AdhocLegs
+        # als json object (as_json=True)
+        # of als dict (as_json=False)
+        caps = []
+        for c in self.planning.adhoc_capaciteiten:
+            leg_attr = ["id", "van", "naar", "vertrek", "aankomst"]
+            cap_attr = ["aantal", "containertype", "prijs", "emissie"]
+            d = dict()
+            for attr in leg_attr:
+                d[attr] = str(getattr(c.leg, attr))
+            for attr in cap_attr:
+                a = getattr(c, attr)
+                d[attr] = str(a) if attr == "containertype" else a
+            caps.append(d)
+        return json.dumps(caps) if as_json else caps
+
+    def geef_routes_per_order(self, as_json=True):
+        # routes (= trajecten) gegroepeerd per order
+        routes = []
+        for order, trajecten in self.planning.geef_unieke_trajecten_per_order().items():
+            for traject, attr in trajecten.items():
+                d = dict()
+                d["orderId"] = order.id  # moet order.db_id worden
+                d["checkin"] = str(traject[0].leg.checkin)
+                d["vertrek"] = str(traject[0].leg.vertrek)
+                d["aankomst"] = str(traject[-1].leg.aankomst)
+                d["amount"] = int(attr["aantal"])
+                d["containerType"] = str(traject[0].containertype)
+                d["prijs"] = attr["prijs"]
+                d["co2"] = attr["emissie"]
+                d["penalty"] = attr["boete"]
+                d["LegsIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
+                routes.append(d)
+        return json.dumps(routes) if as_json else routes

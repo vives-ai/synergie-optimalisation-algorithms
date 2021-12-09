@@ -101,7 +101,7 @@ class LinearProgramming(Methode):
                 if self._x[c.id, l.id].value() == 1:
                     legcapaciteit = l.capaciteiten[c.containertype]
                     traject.append(legcapaciteit)
-            self.planning.voeg_traject_toe(c.id, *sorted(traject))
+            self.planning.voeg_container_traject_toe(c.id, *sorted(traject))
 
 
 class MaakContainerTraject:
@@ -237,7 +237,7 @@ def worst_removal(state: PlanningState, random_state):
                    key=lambda container_id: state.planning.kosten[container_id], reverse=True)
     destroyed = copy.deepcopy(state)
     for i in range(state.aantal_te_verwijderen_trajecten()):
-        destroyed.planning.verwijder_traject(worst[i])
+        destroyed.planning.verwijder_container_traject(worst[i])
     return destroyed
 
 
@@ -245,7 +245,7 @@ def random_removal(state: PlanningState, random_state):
     destroyed = copy.deepcopy(state)
     for i in random_state.choice(len(state.planning.trajecten),
                                  state.aantal_te_verwijderen_trajecten(), replace=False):
-        destroyed.planning.verwijder_traject(i)
+        destroyed.planning.verwijder_container_traject(i)
     return destroyed
 
 
@@ -257,7 +257,7 @@ def __repair(state: PlanningState, random_state, method: str, van_naar=True):
         maak_traject.container = state.planning.geef_container_object(i)
         func = getattr(maak_traject, method)
         traject = func(van_naar)
-        state.planning.voeg_traject_toe(i, *traject)
+        state.planning.voeg_container_traject_toe(i, *traject)
     return state
 
 
@@ -340,6 +340,7 @@ class ALNS(Methode):
         self.result = self.alns.iterate(self.state, self.weights, self.operator_decay, self.criterion, self.iterations,
                                         self.collect_stats)
         self.planning = self.result.best_state.planning
+        self.planning.maak_unieke_adhoc_capaciteiten()
         print("Elapsed time:", round(time() - start, 2), 'sec')
         print("Initial cost:", initial_cost)
         print("Minimized cost:", self.result.best_state.objective() * 1000)
