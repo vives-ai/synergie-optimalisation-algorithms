@@ -312,7 +312,12 @@ class OptimizerResult:
                 d[attr] = str(getattr(c.leg, attr))
             for attr in cap_attr:
                 a = getattr(c, attr)
-                d[attr] = str(a) if attr == "containertype" else a
+                # ugly hack
+                if attr == "containertype":
+                    d["containerType"] = str(a)
+                else:
+                    d[attr] = a  #str(a) if attr == "containertype" else a
+
             caps.append(d)
         return json.dumps(caps) if as_json else caps
 
@@ -331,6 +336,6 @@ class OptimizerResult:
                 d["prijs"] = attr["prijs"]
                 d["co2"] = attr["emissie"]
                 d["penalty"] = attr["boete"]
-                d["LegsIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
+                d["legIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
                 routes.append(d)
         return json.dumps(routes) if as_json else routes
