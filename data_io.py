@@ -290,9 +290,9 @@ class OptimizerResult:
         # of als dict (as_json=False)
         leg_use = []
         for leg in self.planning.legs:
-            for containertype, capaciteit in leg.capaciteiten.items():
+            for containertype, capaciteit in leg.ca_paciteiten.items():
                 d = dict()
-                d["legId"] = leg.id # moet leg.db_id worden
+                d["legId"] = leg.db_id  # moet leg.db_id worden
                 d["containerType"] = str(containertype)
                 d["used"] = len(capaciteit.containers)
                 d["available"] = capaciteit.beschikbaar
@@ -327,7 +327,7 @@ class OptimizerResult:
         for order, trajecten in self.planning.geef_unieke_trajecten_per_order().items():
             for traject, attr in trajecten.items():
                 d = dict()
-                d["orderId"] = order.id  # moet order.db_id worden
+                d["orderId"] = order.db_id  # moet order.db_id worden
                 d["checkin"] = str(traject[0].leg.checkin)
                 d["vertrek"] = str(traject[0].leg.vertrek)
                 d["aankomst"] = str(traject[-1].leg.aankomst)
@@ -336,6 +336,6 @@ class OptimizerResult:
                 d["prijs"] = attr["prijs"]
                 d["co2"] = attr["emissie"]
                 d["penalty"] = attr["boete"]
-                d["legIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
+                d["legIds"] = [capaciteit.leg.db_id for capaciteit in traject]  # moet leg.db_id worden
                 routes.append(d)
         return json.dumps(routes) if as_json else routes
