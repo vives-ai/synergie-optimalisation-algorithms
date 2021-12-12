@@ -132,16 +132,16 @@ class Leg(VanNaar):
         return legcapaciteit
 
     def aantal(self, containertype: ContainerType):
-        return self.capaciteiten[containertype].aantal
+        return self.capaciteiten[containertype].aantal if containertype in self.capaciteiten else 0
 
     def beschikbaar(self, containertype: ContainerType):
-        return self.capaciteiten[containertype].beschikbaar
+        return self.capaciteiten[containertype].beschikbaar if containertype in self.capaciteiten else 0
 
     def prijs(self, containertype: ContainerType):
-        return self.capaciteiten[containertype].prijs
+        return self.capaciteiten[containertype].prijs if containertype in self.capaciteiten else 0
 
     def emissie(self, containertype: ContainerType):
-        return self.capaciteiten[containertype].emissie
+        return self.capaciteiten[containertype].emissie if containertype in self.capaciteiten else 0
 
     def komt_voor(self, leg: Leg):
         return VanNaar.komt_voor(self, leg) and self.aankomst <= leg.checkin
