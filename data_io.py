@@ -21,7 +21,8 @@ class DataObject(ABC, Object):
         self._locaties = {}
         self._containertypes = {}
         self._periode = []
-        self._dagen = dict(zip(['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'], range(7)))
+        self._dagen = dict(
+            zip(['maandag', 'dinsdag', 'woensdag', 'donderdag', 'vrijdag', 'zaterdag', 'zondag'], range(7)))
 
     @abstractmethod
     def geef_planning_object(self):
@@ -154,7 +155,8 @@ class JsonObject(DataObject):
             leg.dag = dag
             if 'id' in leg_dict:
                 leg.db_id = leg_dict['id']
-            self.planning.voeg_legcapaciteit_toe(leg, leg_dict['aantal'], self._containertypes[leg_dict['containertype']],
+            self.planning.voeg_legcapaciteit_toe(leg, leg_dict['aantal'],
+                                                 self._containertypes[leg_dict['containertype']],
                                                  leg_dict['prijs'], leg_dict['co2'])
 
     @staticmethod
@@ -222,7 +224,8 @@ class DataFrameDict(DataObject):
         containertypes = set(self.legcapaciteiten.containertype).union(set(self.ordercapaciteiten.containertype))
         gewicht = self.adhoc_legs.values.flatten()[5]
         for containertype in containertypes:
-            self._containertypes[containertype] = self.planning.voeg_containertype_toe(str(containertype) + 'ft', gewicht)
+            self._containertypes[containertype] = self.planning.voeg_containertype_toe(str(containertype) + 'ft',
+                                                                                       gewicht)
 
     def _voeg_orders_toe(self):
         for _, row in self.orders.iterrows():
@@ -240,7 +243,8 @@ class DataFrameDict(DataObject):
         for _, row in self.legs.iterrows():
             duur = timedelta(seconds=row.duur.hour * 3600.0 + row.duur.minute * 60.0 + row.duur.second)
             checkin, vertrek, aankomst = self._bepaal_tijden(row.dag, row.checkin, row.vertrek, duur)
-            leg = self.planning.voeg_leg_toe(self._locaties[row.van], self._locaties[row.naar], checkin, vertrek, aankomst)
+            leg = self.planning.voeg_leg_toe(self._locaties[row.van], self._locaties[row.naar], checkin, vertrek,
+                                             aankomst)
             leg.dag = row.dag
             try:
                 leg.modus = row.modus
@@ -352,6 +356,7 @@ class OptimizerResult:
                 d["prijs"] = attr["prijs"]
                 d["co2"] = attr["emissie"]
                 d["penalty"] = attr["boete"]
-                d["legIds"] = [capaciteit.leg.db_id for capaciteit in traject]  # moet leg.db_id worden
+                d["legIds"] = [capaciteit.leg.db_id if capaciteit.leg.db_id != '' else capaciteit.leg.id for capaciteit
+                               in traject]  # moet leg.db_id worden
                 routes.append(d)
         return json.dumps(routes) if as_json else routes
