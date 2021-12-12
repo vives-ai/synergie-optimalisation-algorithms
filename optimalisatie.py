@@ -89,10 +89,11 @@ class LinearProgramming(Methode):
         self._capacity_constraints()
         self._time_constraints()
         self.pulp.solve()
-        self._get_solution()
         print("Elapsed time:", round(time() - start, 2), 'sec')
         print("Solution status:", pulp.LpStatus[self.pulp.status])
-        print("Minimal cost:", pulp.value(self.pulp.objective))
+        if self.pulp.status == 1:  # feasible
+            self._get_solution()
+            print("Minimal cost:", pulp.value(self.pulp.objective))
 
     def _get_solution(self):
         for c in self.planning.geef_containers():
@@ -101,7 +102,7 @@ class LinearProgramming(Methode):
                 if self._x[c.id, l.id].value() == 1:
                     legcapaciteit = l.capaciteiten[c.containertype]
                     traject.append(legcapaciteit)
-            self.planning.voeg_container_traject_toe(c.id, *sorted(traject))
+            self.planning.voeg_container_traject_toe(c.id, *traject)
 
 
 class MaakContainerTraject:

@@ -242,6 +242,10 @@ class DataFrameDict(DataObject):
             checkin, vertrek, aankomst = self._bepaal_tijden(row.dag, row.checkin, row.vertrek, duur)
             leg = self.planning.voeg_leg_toe(self._locaties[row.van], self._locaties[row.naar], checkin, vertrek, aankomst)
             leg.dag = row.dag
+            try:
+                leg.modus = row.modus
+            except:
+                pass
             for _, cap in self.legcapaciteiten.iterrows():
                 if cap.leg == row.id:
                     self.planning.voeg_legcapaciteit_toe(leg, int(cap.aantal), self._containertypes[cap.containertype],
@@ -290,7 +294,7 @@ class OptimizerResult:
         # of als dict (as_json=False)
         leg_use = []
         for leg in self.planning.legs:
-            for containertype, capaciteit in leg.ca_paciteiten.items():
+            for containertype, capaciteit in leg.capaciteiten.items():
                 d = dict()
                 d["legId"] = leg.db_id  # moet leg.db_id worden
                 d["containerType"] = str(containertype)
@@ -312,22 +316,34 @@ class OptimizerResult:
                 d[attr] = str(getattr(c.leg, attr))
             for attr in cap_attr:
                 a = getattr(c, attr)
-                # ugly hack
-                if attr == "containertype":
-                    d["containerType"] = str(a)
-                else:
-                    d[attr] = a  #str(a) if attr == "containertype" else a
-
+                d[attr] = str(a) if attr == "containertype" else a
             caps.append(d)
         return json.dumps(caps) if as_json else caps
 
+    def geef_routes(self, as_json=True):
+        # unieke routes (= trajecten)
+        trajecten = self.planning.geef_unieke_trajecten(groepeer_orders=True)
+        routes = []
+        for traject, orders in trajecten.items():
+            d = dict()
+            d["LegsIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
+            d["containerType"] = str(traject[0].containertype)
+            d["orders"] = []
+            for order, aantal in orders.items():
+                o = dict()
+                o["orderId"] = order.db_id  # moet order.db_id worden
+                o["amount"] = int(aantal)
+                d["orders"].append(o)
+            routes.append(d)
+        return json.dumps(routes) if as_json else routes
+
     def geef_routes_per_order(self, as_json=True):
-        # routes (= trajecten) gegroepeerd per order
+        # unieke routes (= trajecten) gegroepeerd per order
         routes = []
         for order, trajecten in self.planning.geef_unieke_trajecten_per_order().items():
             for traject, attr in trajecten.items():
                 d = dict()
-                d["orderId"] = order.db_id  # moet order.db_id worden
+                d["orderId"] = order.db_id  # order.id  # moet order.db_id worden
                 d["checkin"] = str(traject[0].leg.checkin)
                 d["vertrek"] = str(traject[0].leg.vertrek)
                 d["aankomst"] = str(traject[-1].leg.aankomst)

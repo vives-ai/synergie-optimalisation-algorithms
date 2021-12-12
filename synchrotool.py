@@ -120,6 +120,7 @@ class Leg(VanNaar):
         self.vertrek = vertrek
         self.aankomst = aankomst
         self.dag = ""
+        self.modus = ""
 
     @property
     def duur(self):
@@ -161,6 +162,12 @@ class Leg(VanNaar):
         df1.columns = ["leg_" + column for column in df1.columns]
         df2 = pd.DataFrame(dict(dag=[self.dag], checkin=[self.checkin], vertrek=[self.vertrek], aankomst=[self.aankomst]))
         return pd.concat((df1, df2), axis=1)
+
+    def __repr__(self):
+        if self.modus == "":
+            return f"{self.id}: {self.van} - {self.naar}"
+        else:
+            return f"{self.id}: {self.van} - {self.naar} ({self.modus})"
 
 
 class Order(VanNaar):
@@ -424,15 +431,31 @@ class Planning:
     def geef_container_traject(self, container_id: int):
         return self.trajecten[container_id]
 
-    def voeg_container_traject_toe(self, container_id: int, *legcapaciteiten):
-        for legcapaciteit in legcapaciteiten:
+    def voeg_container_traject_toe(self, container_id: int, *traject):
+        for legcapaciteit in traject:
             legcapaciteit.containers.append(container_id)
             if legcapaciteit not in self.legcapaciteiten:
                 self.adhoc_capaciteiten.append(legcapaciteit)
-        self.trajecten[container_id] = legcapaciteiten
+        self.trajecten[container_id] = self.__sorteer_container_traject(container_id, *traject)
         self.kosten[container_id] = self.geef_totale_kost_van_container_traject(container_id)
         self.te_plannen.remove(container_id)
         self.gepland.add(container_id)
+
+    def __sorteer_container_traject(self, container_id: int, *traject):
+        if all([traject[i] < traject[i + 1] for i in range(len(traject) - 1)]):
+            return traject
+        else:
+            traject = list(traject)
+            sorted_capaciteiten = []
+            van = self.geef_container_object(container_id).order.van
+            while traject:
+                for legcapaciteit in traject:
+                    if van == legcapaciteit.leg.van:
+                        van = legcapaciteit.leg.naar
+                        traject.remove(legcapaciteit)
+                        sorted_capaciteiten.append(legcapaciteit)
+                        break
+            return tuple(sorted_capaciteiten)
 
     def verwijder_container_traject(self, container_id: int):
         for legcapaciteit in self.trajecten[container_id]:
@@ -530,19 +553,29 @@ class Planning:
                 return False
         return True
 
-    def geef_unieke_trajecten(self):
+    def geef_unieke_trajecten(self, groepeer_orders=False):
         # groepeert trajecten
-        # geeft unieke trajecten als {traject: [container_ids]}
-        uniek = dict()
+        # geeft unieke trajecten als [{traject: [container_ids]}] als groepeer_orders=False (default)
+        # en als [{traject: {order: aantal}}] als groepeer_orders=True
+        trajecten = dict()
         for container_id, traject in enumerate(self.trajecten):
-            if traject not in uniek:
-                uniek[traject] = []
-            uniek[traject].append(container_id)
-        return uniek
+            if traject not in trajecten:
+                if groepeer_orders:
+                    trajecten[traject] = dict()
+                else:
+                    trajecten[traject] = []
+            if groepeer_orders:
+                order = self.geef_container_object(container_id).order
+                if order not in trajecten[traject]:
+                    trajecten[traject][order] = 0
+                trajecten[traject][order] += 1
+            else:
+                trajecten[traject].append(container_id)
+        return trajecten
 
     def geef_unieke_trajecten_per_order(self):
         # groepeert trajecten per order
-        # retourneert {order: traject: aantal_containers}
+        # retourneert [{order: traject: aantal_containers}]
         order_trajecten = dict()
         for order in self.orders:
             order_trajecten[order] = dict()
