@@ -336,7 +336,8 @@ class OptimizerResult:
         routes = []
         for traject, orders in trajecten.items():
             d = dict()
-            d["LegsIds"] = [capaciteit.leg.id for capaciteit in traject]  # moet leg.db_id worden
+            d["legIds"] = [capaciteit.leg.db_id if capaciteit.leg.db_id != '' else capaciteit.leg.id for capaciteit in
+                           traject]  # moet leg.db_id worden
             d["containerType"] = str(traject[0].containertype)
             d["orders"] = []
             for order, aantal in orders.items():
