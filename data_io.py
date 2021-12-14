@@ -143,6 +143,8 @@ class JsonObject(DataObject):
     def _voeg_legs_toe(self):
         for leg_dict in self.data['legs']:
             dag = leg_dict['dag'].strip()
+            modi = ["Truck", "Trein", "Schip"]
+            modus = modi[leg_dict["modaliteit"]]
             checkin = self.__datetime_str_to_time(leg_dict['checkin'])
             if leg_dict['vertrek'] is None:
                 vertrek = checkin
@@ -153,6 +155,7 @@ class JsonObject(DataObject):
             leg = self.planning.voeg_leg_toe(self._locaties[leg_dict['van']], self._locaties[leg_dict['naar']],
                                              checkin, vertrek, aankomst)
             leg.dag = dag
+            leg.modus = modus
             if 'id' in leg_dict:
                 leg.db_id = leg_dict['id']
             self.planning.voeg_legcapaciteit_toe(leg, leg_dict['aantal'],
@@ -304,6 +307,9 @@ class OptimizerResult:
                 d["containerType"] = str(containertype)
                 d["used"] = len(capaciteit.containers)
                 d["available"] = capaciteit.beschikbaar
+                d["checkin"] = str(leg.checkin)
+                d["vertrek"] = str(leg.vertrek)
+                d["aankomst"] = str(leg.aankomst)
                 leg_use.append(d)
         return json.dumps(leg_use) if as_json else leg_use
 

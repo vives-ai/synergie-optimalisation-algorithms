@@ -137,17 +137,26 @@ class MaakContainerTraject:
         capaciteiten = {capaciteit: kost for capaciteit, kost in capaciteiten.items() if kost is not None}
         return capaciteiten
 
+    def __check_levertijd(self, legcapaciteit):
+        # checkt of de legcapaciteit die in eindbestemming van container aankomt de levertijd respecteert
+        # indien de legcapaciteit niet in de eindbestemming aankomt, dan wordt True geretourneerd.
+        if legcapaciteit.leg.naar != self.container.naar:
+            return True
+        else:
+            return legcapaciteit.is_mogelijk_einde(self.container)
+
     def __maak_traject_van_naar(self, selecteer):
         # traject wordt geconstrueerd van container.van naar container.naar
         # selecteer is een functie die een LegCapaciteit object retourneert uit een input list van legcapaciteiten
         traject = []
-        locaties = set(self.planning.verladers + self.planning.empty_depots)  # alleen terminals alles tussenstop toegestaan!
+        locaties = set(self.planning.verladers + self.planning.empty_depots)  # alleen terminals als tussenstop toegestaan!
         if self.container.van not in locaties:
             locaties.add(self.container.van)  # voeg startlocatie toe aan locaties die verboden zijn
         if self.container.naar in locaties:
             locaties.remove(self.container.naar)  # verwijder eindlocatie uit locaties die verboden zijn
         capaciteiten = [lc for lc in self.planning.legcapaciteiten
-                        if lc.is_mogelijk_begin(self.container) and lc.leg.naar not in locaties]  # alle mogelijke startcapaciteiten
+                        if lc.is_mogelijk_begin(self.container) and lc.leg.naar not in locaties
+                        and self.__check_levertijd(lc)]  # alle mogelijke startcapaciteiten
         capaciteiten = self.__schat_totale_kost(capaciteiten)
         if not capaciteiten:  # geen startcapaciteiten: maak een adhoc capaciteit voor het ganse traject
             capaciteit = self.planning.adhoc_legs.maak_leg(self.container)
@@ -162,7 +171,8 @@ class MaakContainerTraject:
             else:
                 locaties.add(capaciteit.leg.naar)  ###
                 capaciteiten = [lc for lc in self.planning.legcapaciteiten
-                                if lc.komt_na(capaciteit) and lc.leg.naar not in locaties]  # alle mogelijke volgende capaciteiten ###
+                                if lc.komt_na(capaciteit) and lc.leg.naar not in locaties
+                                and self.__check_levertijd(lc)]  # alle mogelijke volgende capaciteiten ###
                 capaciteiten = self.__schat_totale_kost(capaciteiten)
                 if not capaciteiten:  # geen capaciteit gevonden: creëer adhoc capaciteit tot eindbestemming
                     capaciteit = None
@@ -177,6 +187,14 @@ class MaakContainerTraject:
                         traject.append(capaciteit)
                     return traject
 
+    def __check_ophaaltijd(self, legcapaciteit):
+        # checkt of de legcapaciteit die in startbestemming van container vertrekt de ophaaltijd respecteert
+        # indien de legcapaciteit niet in de startbestemming vertrekt, dan wordt True geretourneerd.
+        if legcapaciteit.leg.van != self.container.van:
+            return True
+        else:
+            return legcapaciteit.is_mogelijk_begin(self.container)
+
     def __maak_traject_naar_van(self, selecteer):
         # traject wordt omgekeerd geconstrueerd van container.naar naar container.van
         # selecteer is een functie die een LegCapaciteit object retourneert uit een input list van legcapaciteiten
@@ -187,7 +205,8 @@ class MaakContainerTraject:
         if self.container.naar not in locaties:
             locaties.add(self.container.naar)  # voeg eindlocatie toe aan locaties die verboden zijn
         capaciteiten = [lc for lc in self.planning.legcapaciteiten
-                        if lc.is_mogelijk_einde(self.container) and lc.leg.van not in locaties]  # alle mogelijke eindcapaciteiten
+                        if lc.is_mogelijk_einde(self.container) and lc.leg.van not in locaties
+                        and self.__check_ophaaltijd(lc)]  # alle mogelijke eindcapaciteiten
         capaciteiten = self.__schat_totale_kost(capaciteiten)
         if not capaciteiten:  # geen eindcapaciteiten: maak een adhoc capaciteit voor het ganse traject
             capaciteit = self.planning.adhoc_legs.maak_leg(self.container)
@@ -203,7 +222,8 @@ class MaakContainerTraject:
             else:
                 locaties.add(capaciteit.leg.van)  ###
                 capaciteiten = [lc for lc in self.planning.legcapaciteiten
-                                if lc.komt_voor(capaciteit) and lc.leg.van not in locaties]  # alle mogelijke voorgaande capaciteiten ###
+                                if lc.komt_voor(capaciteit) and lc.leg.van not in locaties
+                                and self.__check_ophaaltijd(lc)]  # alle mogelijke voorgaande capaciteiten ###
                 capaciteiten = self.__schat_totale_kost(capaciteiten)
                 if not capaciteiten:  # geen capaciteit gevonden: creëer adhoc capaciteit tot startbestemming
                     capaciteit = None
